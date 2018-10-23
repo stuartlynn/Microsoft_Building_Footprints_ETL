@@ -1,6 +1,8 @@
 #!/bin/bash
 
 mkdir -p derived_data
-cd derived_data
 
-../calculate_footprint_area
+for filename in ./data/*.geojson;
+do
+  ./calculate_footprint_area $filename derived_data/$(basename "${filename%.*}").geojson
+done

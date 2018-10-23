@@ -1,6 +1,6 @@
 #!/bin/bash
 
-docker run -it --rm -v $(pwd)/data:/data klokantech/tippecanoe tippecanoe -o data/buildings.mbtiles -l buildings -z13 --drop-densest-as-needed \
+docker run -it --rm -v $(pwd)/derived_data:/data klokantech/tippecanoe tippecanoe -o data/buildings.mbtiles -l buildings -z13 --drop-densest-as-needed \
 data/Alabama.geojson \
 data/Hawaii.geojson \
 data/Michigan.geojson \

@@ -4,6 +4,7 @@ import "io/ioutil"
 import "github.com/paulmach/go.geojson"
 import "github.com/golang/geo/s2"
 import "fmt"
+import "strings"
 import "sort"
 import "os"
 
@@ -69,41 +70,60 @@ func sortAreas(areas map[int]float64) []int {
 func main() {
 	targetFile := os.Args[1]
 	outFile := os.Args[2]
+	var maxNumFeaturesPerPart int = 1000000
 
 	geo, err := ioutil.ReadFile(targetFile)
 	check(err)
 	resultFC := geojson.NewFeatureCollection()
 
-	println("Reading GeoJSON File")
+	println("Reading GeoJSON from ", targetFile)
 
 	fc1, err := geojson.UnmarshalFeatureCollection(geo)
-	var indexOffset int = 0
 	geoms = make(map[int]geojson.Geometry)
 	areas = make(map[int]float64)
 	println("parsing geometries")
 
 	noFeatures := len(fc1.Features)
+	println("len of features: ", noFeatures)
+
+	// Split large geoJson files to smaller files
+	var splitCount int = 1
+	tempOutFileBase := outFile[:strings.Index(outFile, ".geo")]
+	tempOutFile := fmt.Sprintf("%s_part_%d.geojson", tempOutFileBase, splitCount)
 
 	for index, feature := range fc1.Features {
 		if index%10000 == 0 {
 			fmt.Printf("Done %d of %d %d%%  \n", index, noFeatures, index*100.0/noFeatures)
 		}
-		geoms[index+indexOffset] = *feature.Geometry
-		//id := feature.ID
+		if (index >= maxNumFeaturesPerPart) && (index%maxNumFeaturesPerPart == 0) {
+			tempOutFile = fmt.Sprintf("%s_part_%d.geojson", tempOutFileBase, splitCount)
+			rawJSON, err := resultFC.MarshalJSON()
+			check(err)
+
+			println("Saving %d features to ", len(resultFC.Features), tempOutFile)
+			ioutil.WriteFile(tempOutFile, rawJSON, 0644)
+
+			check(err)
+			splitCount++
+			resultFC = geojson.NewFeatureCollection()
+		}
+
 		poly := parsePolygon(*feature)
 		area := calcArea(*poly)
 		feature.SetProperty("area", area)
 		resultFC.AddFeature(feature)
 
-		areas[index+indexOffset] = area
 	}
-	keys := sortAreas(areas)
-	println(len(geoms))
-	println(keys[len(keys)-1], areas[len(keys)-1])
+	if splitCount > 1 {
+		tempOutFile = fmt.Sprintf("%s_part_%d.geojson", tempOutFileBase, splitCount)
+	} else { // Don't have to split the file
+		tempOutFile = outFile
+	}
 	rawJSON, err := resultFC.MarshalJSON()
 	check(err)
 
-	ioutil.WriteFile(outFile, rawJSON, 0644)
+	println("Saving %d features to ", len(resultFC.Features), tempOutFile)
+	ioutil.WriteFile(tempOutFile, rawJSON, 0644)
 
 	check(err)
 
